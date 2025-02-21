@@ -1,0 +1,10 @@
+version: '3.8'
+services:
+  offline-whisper:
+    build: .
+    image: ghcr.io/mgiesen/offline-whisper:latest
+    environment:
+      - WHISPER_LANGUAGE=de
+    ports:
+      - "8077:8077"
+    restart: unless-stopped
