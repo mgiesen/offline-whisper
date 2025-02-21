@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Offline Whisper</title>
+		<style>
+			body {
+				position: relative;
+				min-height: 100vh;
+				padding-top: 80px;
+			}
+			.title {
+				font-size: 2.5rem;
+				margin-bottom: 2rem;
+				color: #2c3e50;
+				font-weight: bold;
+			}
+			@media (max-width: 768px) {
+				.title {
+					font-size: 2rem;
+					margin-bottom: 1.5rem;
+				}
+				body {
+					padding: 60px 10px 20px;
+				}
+				.github-link {
+					top: 10px;
+					right: 10px;
+				}
+			}
+			body {
+				font-family: Arial, sans-serif;
+				padding: 20px;
+				text-align: center;
+				max-width: 800px;
+				margin: 0 auto;
+			}
+			.github-link {
+				position: absolute;
+				top: 20px;
+				right: 20px;
+				display: flex;
+				align-items: center;
+				text-decoration: none;
+				color: #333;
+				transition: opacity 0.3s;
+			}
+			.github-link:hover {
+				opacity: 0.7;
+			}
+			.github-link svg {
+				width: 24px;
+				height: 24px;
+				margin-right: 8px;
+			}
+			.controls {
+				margin: 20px 0;
+			}
+			#recordControls {
+				display: none;
+				margin-top: 20px;
+			}
+			#transcriptionResult {
+				margin-top: 20px;
+				padding: 15px;
+				border: 1px solid #ddd;
+				border-radius: 5px;
+				display: none;
+			}
+			.loading {
+				display: none;
+				margin: 20px auto;
+			}
+			.loading-spinner {
+				border: 4px solid #f3f3f3;
+				border-top: 4px solid #3498db;
+				border-radius: 50%;
+				width: 40px;
+				height: 40px;
+				animation: spin 1s linear infinite;
+				margin: 10px auto;
+			}
+			@keyframes spin {
+				0% { transform: rotate(0deg); }
+				100% { transform: rotate(360deg); }
+			}
+			.error-message {
+				color: red;
+				margin: 10px 0;
+				display: none;
+			}
+			button {
+				padding: 10px 20px;
+				margin: 5px;
+				border: none;
+				border-radius: 5px;
+				background-color: #3498db;
+				color: white;
+				cursor: pointer;
+			}
+			button:disabled {
+				background-color: #cccccc;
+				cursor: not-allowed;
+			}
+			select {
+				padding: 8px;
+				margin: 10px;
+				border-radius: 5px;
+			}
+			.recording-indicator {
+				display: none;
+				color: red;
+				margin: 10px 0;
+			}
+		</style>
+	</head>
+	<body>
+		<h1 class="title">Offline Whisper</h1>
+		<a href="https://github.com/mgiesen/offline-whisper" target="_blank" class="github-link">
+			<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+				<path fill="currentColor" d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+			</svg>
+			GitHub
+		</a>
+
+		<div class="controls">
+			<button id="uploadBtn">Upload Audio File</button>
+			<input id="fileInput" type="file" accept="audio/*" style="display: none" />
+			<button id="activateAudioBtn" disabled>Record Audio</button>
+		</div>
+
+		<div id="recordControls">
+			<div>
+				<label for="micSelect">Select Microphone:</label>
+				<select id="micSelect"></select>
+			</div>
+			<button id="recordBtn">Start Recording</button>
+			<div class="recording-indicator" id="recordingIndicator">🔴 Recording...</div>
+		</div>
+
+		<div class="loading" id="loadingIndicator">
+			<div class="loading-spinner"></div>
+			<p>Processing audio...</p>
+		</div>
+
+		<div class="error-message" id="errorMessage"></div>
+
+		<div id="transcriptionResult"></div>
+
+		<script>
+			let mediaRecorder;
+			let recordedChunks = [];
+			let stream;
+
+			const uploadBtn = document.getElementById("uploadBtn");
+			const fileInput = document.getElementById("fileInput");
+			const activateAudioBtn = document.getElementById("activateAudioBtn");
+			const recordControls = document.getElementById("recordControls");
+			const micSelect = document.getElementById("micSelect");
+			const recordBtn = document.getElementById("recordBtn");
+			const loadingIndicator = document.getElementById("loadingIndicator");
+			const errorMessage = document.getElementById("errorMessage");
+			const transcriptionResult = document.getElementById("transcriptionResult");
+			const recordingIndicator = document.getElementById("recordingIndicator");
+
+			function setControlsState(disabled) {
+				uploadBtn.disabled = disabled;
+				activateAudioBtn.disabled = disabled;
+				recordBtn.disabled = disabled;
+				micSelect.disabled = disabled;
+			}
+
+			function showError(message) {
+				errorMessage.textContent = message;
+				errorMessage.style.display = "block";
+				setTimeout(() => {
+					errorMessage.style.display = "none";
+				}, 5000);
+			}
+
+			uploadBtn.addEventListener("click", () => fileInput.click());
+
+			fileInput.addEventListener("change", (e) => {
+				if (e.target.files.length > 0) {
+					processAudioData(e.target.files[0]);
+				}
+			});
+
+			function checkAudioSupport() {
+				if (typeof MediaRecorder === "undefined") {
+					throw new Error("Your browser doesn't support audio recording (MediaRecorder not available)");
+				}
+				if (!navigator.mediaDevices?.getUserMedia && !navigator.getUserMedia && !navigator.webkitGetUserMedia && !navigator.mozGetUserMedia) {
+					throw new Error("Your browser doesn't support microphone recording");
+				}
+			}
+
+			if (!navigator.mediaDevices) {
+				navigator.mediaDevices = {};
+			}
+
+			navigator.mediaDevices.getUserMedia =
+				navigator.mediaDevices.getUserMedia ||
+				function (constraints) {
+					const getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia;
+					if (!getUserMedia) {
+						return Promise.reject(new Error("getUserMedia is not supported by this browser"));
+					}
+					return new Promise((resolve, reject) => {
+						getUserMedia.call(navigator, constraints, resolve, reject);
+					});
+				};
+
+			async function initAudio() {
+				try {
+					checkAudioSupport();
+					stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+					let devices = [];
+					try {
+						devices = await navigator.mediaDevices.enumerateDevices();
+					} catch (enumError) {
+						console.warn("Could not retrieve device list:", enumError);
+						devices = [
+							{
+								kind: "audioinput",
+								deviceId: "default",
+								label: "Default Microphone",
+							},
+						];
+					}
+					const audioDevices = devices.filter((d) => d.kind === "audioinput");
+					if (audioDevices.length === 0) throw new Error("No microphone found");
+					micSelect.innerHTML = audioDevices.map((d, i) => `<option value="${d.deviceId}">${d.label || "Microphone " + (i + 1)}</option>`).join("");
+					mediaRecorder = new MediaRecorder(stream);
+					setupMediaRecorderEvents();
+					activateAudioBtn.disabled = false;
+				} catch (error) {
+					showError("Error: " + error.message);
+					console.error(error);
+				}
+			}
+
+			function setupMediaRecorderEvents() {
+				mediaRecorder.ondataavailable = (e) => {
+					if (e.data.size > 0) {
+						recordedChunks.push(e.data);
+					}
+				};
+				mediaRecorder.onstop = () => {
+					const blob = new Blob(recordedChunks, { type: "audio/webm" });
+					processAudioData(blob);
+				};
+			}
+
+			async function setupMicrophone() {
+				try {
+					if (stream) {
+						stream.getTracks().forEach((track) => track.stop());
+					}
+					stream = await navigator.mediaDevices.getUserMedia({
+						audio: { deviceId: micSelect.value ? { exact: micSelect.value } : undefined },
+					});
+					mediaRecorder = new MediaRecorder(stream);
+					setupMediaRecorderEvents();
+				} catch (error) {
+					showError("Error setting up microphone: " + error.message);
+				}
+			}
+
+			micSelect.addEventListener("change", setupMicrophone);
+
+			activateAudioBtn.addEventListener("click", () => {
+				if (micSelect.options.length > 0) {
+					recordControls.style.display = "block";
+				}
+			});
+
+			recordBtn.addEventListener("click", () => {
+				if (!mediaRecorder || mediaRecorder.state === "inactive") {
+					recordedChunks = [];
+					mediaRecorder.start();
+					recordBtn.textContent = "Stop Recording";
+					recordingIndicator.style.display = "block";
+				} else {
+					mediaRecorder.stop();
+					recordBtn.textContent = "Start Recording";
+					recordingIndicator.style.display = "none";
+				}
+			});
+
+			async function processAudioData(audioFile) {
+				setControlsState(true);
+				loadingIndicator.style.display = "block";
+				transcriptionResult.style.display = "none";
+
+				const formData = new FormData();
+				formData.append("file", audioFile, "recording.webm");
+
+				try {
+					const response = await fetch("/api/transcribe", {
+						method: "POST",
+						body: formData,
+					});
+					
+					if (response.status === 423) {
+						throw new Error("Service is currently busy. Please try again in a few seconds.");
+					}
+					
+					if (!response.ok) {
+						throw new Error(`HTTP error! Status: ${response.status}`);
+					}
+					
+					const text = await response.text();
+					transcriptionResult.textContent = text;
+					transcriptionResult.style.display = "block";
+				} catch (error) {
+					showError("Processing error: " + error.message);
+				} finally {
+					loadingIndicator.style.display = "none";
+					setControlsState(false);
+					fileInput.value = "";
+				}
+			}
+
+			window.addEventListener("DOMContentLoaded", initAudio);
+		</script>
+	</body>
+</html>
