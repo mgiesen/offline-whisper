@@ -32,6 +32,8 @@ If you simply want to use the application without modifying the code, you can ru
 
 3. **Access the web interface** at `http://localhost:8077`
 
+![Image](readme/webapp.png)
+
 ### For Developers
 
 If you want to modify the code before running the application, follow these steps:
