@@ -11,14 +11,14 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Preload Whisper models
-RUN python -c "import whisper; whisper.load_model('large')"
-
-# Copy application code
-COPY app/ .
+# Environment variable for model size (default to large if not specified)
+ENV WHISPER_MODEL="large"
 
 # Create temporary directory
 RUN mkdir -p /tmp
+
+# Copy application code
+COPY app/ .
 
 # Start FastAPI application
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8076"]

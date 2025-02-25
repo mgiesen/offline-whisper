@@ -4,18 +4,19 @@ A lightweight Docker-based implementation of OpenAI's Whisper model for local sp
 
 ## Features
 
-- Local deployment of OpenAI's Whisper model (large preselected)
+- Local deployment of OpenAI's Whisper model
 - Web interface for audio file uploads
 - Browser-based audio recording (localhost only)
+- Language selection directly in the web interface
+- Configurable Whisper model size (requires Docker-Build)
 - Docker containerization for easy deployment
-- Configurable target language for transcription
 - No data persistence - all audio files and transcriptions are deleted after processing
 
 ## Usage
 
 ### For End Users
 
-If you simply want to use the application without modifying the code, you can run the pre-built Docker image. Note that the current pre-built version is configured to transcribe German input and utilize the `large` model.
+If you simply want to use the application without modifying the code, you can run the pre-built Docker image.
 
 1. **Pull the Docker image**
 
@@ -42,24 +43,22 @@ If you want to modify the code before running the application, follow these step
    cd offline-whisper
    ```
 
-2. **Configure target language (optional)**
-   The default target language is English ('en'). To change it, modify the `WHISPER_LANGUAGE` environment variable in `docker-compose.yml`:
+2. **Configure default model size (optional)**
+   You can change the default model size by modifying the environment variables in `docker-compose.yml`:
 
    ```yaml
    whisper:
      environment:
-       - WHISPER_LANGUAGE=en # Change this value
+       - WHISPER_MODEL=large
    ```
 
-   Common language codes:
+   **Available model sizes:**
 
-   - English: 'en'
-   - German: 'de'
-   - French: 'fr'
-   - Spanish: 'es'
-   - Italian: 'it'
-   - Japanese: 'ja'
-   - Chinese: 'zh'
+   - `tiny`: Fastest, lowest accuracy
+   - `base`: Fast with decent accuracy
+   - `small`: Good balance of speed and accuracy
+   - `medium`: Better accuracy, slower
+   - `large`: Best accuracy, slowest
 
 3. **Build and start the containers**
 
@@ -72,10 +71,15 @@ If you want to modify the code before running the application, follow these step
 ## Important Notes
 
 - The microphone recording feature only works on localhost or with HTTPS due to browser security restrictions
-- The Whisper model will be downloaded during the first build (\~6GB)
-- Language can only be changed before starting the container
+- The Whisper model will be downloaded during the first build (size depends on the selected model)
 - All uploaded audio files and generated transcripts are automatically deleted after processing for privacy
 - No data is stored persistently - everything is processed in memory only
+- Model size comparison:
+  - `tiny`: ~150MB
+  - `base`: ~150MB
+  - `small`: ~500MB
+  - `medium`: ~1.5GB
+  - `large`: ~6GB
 
 ## Technical Details
 
@@ -83,6 +87,7 @@ If you want to modify the code before running the application, follow these step
 
 - Limited error handling for concurrent requests
 - No HTTPS configuration included
+- Changing model size requires restarting the container
 
 ## Acknowledgments
 

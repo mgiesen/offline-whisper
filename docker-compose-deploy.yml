@@ -4,7 +4,7 @@ services:
     build: .
     image: ghcr.io/mgiesen/offline-whisper:latest
     environment:
-      - WHISPER_LANGUAGE=de
+      - WHISPER_MODEL=large
     ports:
       - "8077:8077"
     restart: unless-stopped

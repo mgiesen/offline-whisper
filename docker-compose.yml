@@ -2,7 +2,7 @@ services:
   whisper:
     build: ./whisper-api
     environment:
-      - WHISPER_LANGUAGE=de
+      - WHISPER_MODEL=large
     restart: unless-stopped
 
   webserver:
