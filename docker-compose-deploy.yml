@@ -1,10 +1,15 @@
 version: '3.8'
 services:
-  offline-whisper:
-    build: .
-    image: ghcr.io/mgiesen/offline-whisper:latest
-    environment:
-      - WHISPER_MODEL=large
+  whisper:  
+    build:
+      context: ./whisper-api
+      dockerfile: Dockerfile-Deploy
+    restart: unless-stopped
+
+  webserver:
+    build: ./nginx
     ports:
       - "8077:8077"
+    depends_on:
+      - whisper
     restart: unless-stopped

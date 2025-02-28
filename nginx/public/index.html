@@ -57,10 +57,6 @@
 			.controls {
 				margin: 20px 0;
 			}
-			#recordControls {
-				display: none;
-				margin-top: 20px;
-			}
 			#transcriptionResult {
 				margin-top: 20px;
 				padding: 15px;
@@ -112,11 +108,6 @@
 				margin: 10px;
 				border-radius: 5px;
 			}
-			.recording-indicator {
-				display: none;
-				color: red;
-				margin: 10px 0;
-			}
 			.settings {
 				margin-bottom: 20px;
 				padding: 15px;
@@ -127,6 +118,14 @@
 			.settings label {
 				margin-right: 5px;
 				font-weight: bold;
+			}
+			.model-info {
+				font-size: 0.8rem;
+				margin-top: 5px;
+				color: #666;
+			}
+			.model-loaded {
+				color: green;
 			}
 		</style>
 	</head>
@@ -155,21 +154,22 @@
 					<option value="ru">Russian</option>
 				</select>
 			</div>
+			<div style="margin-top: 10px">
+				<label for="modelSelect">Whisper Model:</label>
+				<select id="modelSelect">
+					<option value="tiny">Tiny (~150MB) - Fastest</option>
+					<option value="base">Base (~150MB) - Fast</option>
+					<option value="small">Small (~500MB) - Balanced</option>
+					<option value="medium">Medium (~1.5GB) - Good</option>
+					<option value="large">Large (~6GB) - Best Accuracy</option>
+				</select>
+				<div id="modelInfo" class="model-info"></div>
+			</div>
 		</div>
 
 		<div class="controls">
 			<button id="uploadBtn">Upload Audio File</button>
 			<input id="fileInput" type="file" accept="audio/*" style="display: none" />
-			<button id="activateAudioBtn" disabled>Record Audio</button>
-		</div>
-
-		<div id="recordControls">
-			<div>
-				<label for="micSelect">Select Microphone:</label>
-				<select id="micSelect"></select>
-			</div>
-			<button id="recordBtn">Start Recording</button>
-			<div class="recording-indicator" id="recordingIndicator">🔴 Recording...</div>
 		</div>
 
 		<div class="loading" id="loadingIndicator">
@@ -182,28 +182,19 @@
 		<div id="transcriptionResult"></div>
 
 		<script>
-			let mediaRecorder;
-			let recordedChunks = [];
-			let stream;
-
 			const uploadBtn = document.getElementById("uploadBtn");
 			const fileInput = document.getElementById("fileInput");
-			const activateAudioBtn = document.getElementById("activateAudioBtn");
-			const recordControls = document.getElementById("recordControls");
-			const micSelect = document.getElementById("micSelect");
-			const recordBtn = document.getElementById("recordBtn");
 			const loadingIndicator = document.getElementById("loadingIndicator");
 			const errorMessage = document.getElementById("errorMessage");
 			const transcriptionResult = document.getElementById("transcriptionResult");
-			const recordingIndicator = document.getElementById("recordingIndicator");
 			const languageSelect = document.getElementById("languageSelect");
+			const modelSelect = document.getElementById("modelSelect");
+			const modelInfo = document.getElementById("modelInfo");
 
 			function setControlsState(disabled) {
 				uploadBtn.disabled = disabled;
-				activateAudioBtn.disabled = disabled;
-				recordBtn.disabled = disabled;
-				micSelect.disabled = disabled;
 				languageSelect.disabled = disabled;
+				modelSelect.disabled = disabled;
 			}
 
 			function showError(message) {
@@ -222,107 +213,28 @@
 				}
 			});
 
-			function checkAudioSupport() {
-				if (typeof MediaRecorder === "undefined") {
-					throw new Error("Your browser doesn't support audio recording (MediaRecorder not available)");
-				}
-				if (!navigator.mediaDevices?.getUserMedia && !navigator.getUserMedia && !navigator.webkitGetUserMedia && !navigator.mozGetUserMedia) {
-					throw new Error("Your browser doesn't support microphone recording");
-				}
-			}
-
-			if (!navigator.mediaDevices) {
-				navigator.mediaDevices = {};
-			}
-
-			navigator.mediaDevices.getUserMedia =
-				navigator.mediaDevices.getUserMedia ||
-				function (constraints) {
-					const getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia;
-					if (!getUserMedia) {
-						return Promise.reject(new Error("getUserMedia is not supported by this browser"));
-					}
-					return new Promise((resolve, reject) => {
-						getUserMedia.call(navigator, constraints, resolve, reject);
-					});
-				};
-
-			async function initAudio() {
+			async function checkCurrentModel() {
 				try {
-					checkAudioSupport();
-					stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-					let devices = [];
-					try {
-						devices = await navigator.mediaDevices.enumerateDevices();
-					} catch (enumError) {
-						console.warn("Could not retrieve device list:", enumError);
-						devices = [
-							{
-								kind: "audioinput",
-								deviceId: "default",
-								label: "Default Microphone",
-							},
-						];
+					const response = await fetch("/api/model-info");
+					if (!response.ok) {
+						throw new Error(`HTTP error! Status: ${response.status}`);
 					}
-					const audioDevices = devices.filter((d) => d.kind === "audioinput");
-					if (audioDevices.length === 0) throw new Error("No microphone found");
-					micSelect.innerHTML = audioDevices.map((d, i) => `<option value="${d.deviceId}">${d.label || "Microphone " + (i + 1)}</option>`).join("");
-					mediaRecorder = new MediaRecorder(stream);
-					setupMediaRecorderEvents();
-					activateAudioBtn.disabled = false;
+
+					const modelData = await response.json();
+					if (modelData.is_loaded && modelData.current_model) {
+						modelSelect.value = modelData.current_model;
+						modelInfo.textContent = `Model "${modelData.current_model}" is currently loaded`;
+						modelInfo.classList.add("model-loaded");
+					} else {
+						modelInfo.textContent = "No model currently loaded";
+						modelInfo.classList.remove("model-loaded");
+					}
 				} catch (error) {
-					showError("Error: " + error.message);
-					console.error(error);
+					console.error("Error checking model info:", error);
+					modelInfo.textContent = "Unable to check model status";
+					modelInfo.classList.remove("model-loaded");
 				}
 			}
-
-			function setupMediaRecorderEvents() {
-				mediaRecorder.ondataavailable = (e) => {
-					if (e.data.size > 0) {
-						recordedChunks.push(e.data);
-					}
-				};
-				mediaRecorder.onstop = () => {
-					const blob = new Blob(recordedChunks, { type: "audio/webm" });
-					processAudioData(blob);
-				};
-			}
-
-			async function setupMicrophone() {
-				try {
-					if (stream) {
-						stream.getTracks().forEach((track) => track.stop());
-					}
-					stream = await navigator.mediaDevices.getUserMedia({
-						audio: { deviceId: micSelect.value ? { exact: micSelect.value } : undefined },
-					});
-					mediaRecorder = new MediaRecorder(stream);
-					setupMediaRecorderEvents();
-				} catch (error) {
-					showError("Error setting up microphone: " + error.message);
-				}
-			}
-
-			micSelect.addEventListener("change", setupMicrophone);
-
-			activateAudioBtn.addEventListener("click", () => {
-				if (micSelect.options.length > 0) {
-					recordControls.style.display = "block";
-				}
-			});
-
-			recordBtn.addEventListener("click", () => {
-				if (!mediaRecorder || mediaRecorder.state === "inactive") {
-					recordedChunks = [];
-					mediaRecorder.start();
-					recordBtn.textContent = "Stop Recording";
-					recordingIndicator.style.display = "block";
-				} else {
-					mediaRecorder.stop();
-					recordBtn.textContent = "Start Recording";
-					recordingIndicator.style.display = "none";
-				}
-			});
 
 			async function processAudioData(audioFile) {
 				setControlsState(true);
@@ -330,13 +242,13 @@
 				transcriptionResult.style.display = "none";
 
 				const formData = new FormData();
-				formData.append("file", audioFile, "recording.webm");
+				formData.append("file", audioFile, audioFile.name);
 
-				// Sprache als Query-Parameter übergeben
 				const language = languageSelect.value;
+				const model = modelSelect.value;
 
 				try {
-					const response = await fetch(`/api/transcribe?language=${language}`, {
+					const response = await fetch(`/api/transcribe?language=${language}&model_name=${model}`, {
 						method: "POST",
 						body: formData,
 					});
@@ -352,6 +264,9 @@
 					const text = await response.text();
 					transcriptionResult.textContent = text;
 					transcriptionResult.style.display = "block";
+
+					// Update model info after transcription
+					await checkCurrentModel();
 				} catch (error) {
 					showError("Processing error: " + error.message);
 				} finally {
@@ -361,7 +276,7 @@
 				}
 			}
 
-			window.addEventListener("DOMContentLoaded", initAudio);
+			window.addEventListener("DOMContentLoaded", checkCurrentModel);
 		</script>
 	</body>
 </html>

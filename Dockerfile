@@ -10,12 +10,6 @@ WORKDIR /app
 COPY whisper-api/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Environment variable for model with default
-ENV WHISPER_MODEL="large"
-
-# Preload Whisper model based on environment variable
-RUN python -c "import os, whisper; whisper.load_model(os.getenv('WHISPER_MODEL', 'large'))"
-
 # Copy application code
 COPY whisper-api/app/ .
 

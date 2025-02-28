@@ -1,8 +1,6 @@
 services:
   whisper:
     build: ./whisper-api
-    environment:
-      - WHISPER_MODEL=large
     restart: unless-stopped
 
   webserver:

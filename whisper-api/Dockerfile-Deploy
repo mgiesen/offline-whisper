@@ -11,6 +11,11 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Download all Whisper models during build
+RUN echo 'import whisper\nfor model_size in ["tiny", "base", "small", "medium", "large"]:\n    print(f"Downloading Whisper model: {model_size}")\n    whisper.load_model(model_size)' > /tmp/download_models.py && \
+    python /tmp/download_models.py && \
+    rm /tmp/download_models.py
+
 # Create temporary directory
 RUN mkdir -p /tmp
 

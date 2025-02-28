@@ -1,30 +1,30 @@
 # Offline Whisper
 
-A lightweight Docker-based implementation of OpenAI's Whisper model for local speech recognition. This project provides a simple web interface for uploading audio files and recording audio directly through the browser for transcription.
+A lightweight Docker-based implementation of OpenAI's Whisper model for local speech recognition. This project provides a simple web interface for uploading audio files for transcription.
 
 ## Features
 
 - Local deployment of OpenAI's Whisper model
 - Web interface for audio file uploads
-- Browser-based audio recording (localhost only)
 - Language selection directly in the web interface
-- Configurable Whisper model size (requires Docker-Build)
+- On-demand loading of different Whisper model sizes (tiny to large)
 - Docker containerization for easy deployment
+- Fully offline capable - no internet connection required after initial setup
 - No data persistence - all audio files and transcriptions are deleted after processing
 
 ## Usage
 
-### For End Users
+### For End Users (Offline Usage)
 
-If you simply want to use the application without modifying the code, you can run the pre-built Docker image.
+The pre-built Docker image contains all Whisper models and can be used completely offline.
 
-1. **Pull the Docker image**
+1. **Pull the Docker image** (requires internet connection once)
 
    ```bash
    docker pull ghcr.io/mgiesen/offline-whisper:latest
    ```
 
-2. **Run the container**
+2. **Run the container** (works offline)
 
    ```bash
    docker run -d -p 8077:8077 ghcr.io/mgiesen/offline-whisper:latest
@@ -32,7 +32,18 @@ If you simply want to use the application without modifying the code, you can ru
 
 3. **Access the web interface** at `http://localhost:8077`
 
-![Image](readme/webapp.png)
+4. **Offline Deployment**
+
+   You can export the Docker image to use it on offline systems:
+
+   ```bash
+   # Save the image to a file
+   docker save ghcr.io/mgiesen/offline-whisper:latest > offline-whisper.tar
+
+   # On the offline system
+   docker load < offline-whisper.tar
+   docker run -d -p 8077:8077 ghcr.io/mgiesen/offline-whisper:latest
+   ```
 
 ### For Developers
 
@@ -45,51 +56,56 @@ If you want to modify the code before running the application, follow these step
    cd offline-whisper
    ```
 
-2. **Configure default model size (optional)**
-   You can change the default model size by modifying the environment variables in `docker-compose.yml`:
-
-   ```yaml
-   whisper:
-     environment:
-       - WHISPER_MODEL=large
-   ```
-
-   **Available model sizes:**
-
-   - `tiny`: Fastest, lowest accuracy
-   - `base`: Fast with decent accuracy
-   - `small`: Good balance of speed and accuracy
-   - `medium`: Better accuracy, slower
-   - `large`: Best accuracy, slowest
-
-3. **Build and start the containers**
+2. **Build and start the containers** (development mode)
 
    ```bash
    docker-compose up -d
    ```
 
+   Note: The development build doesn't preload models to save build time. Models will be downloaded on first use.
+
+3. **Build for offline deployment** (includes all models)
+
+   ```bash
+   docker-compose -f docker-compose-deploy.yml up -d --build
+   ```
+
 4. **Access the web interface** at `http://localhost:8077`
+
+## Web interface
+
+![Image](readme/webapp.png)
 
 ## Important Notes
 
-- The microphone recording feature only works on localhost or with HTTPS due to browser security restrictions
-- The Whisper model will be downloaded during the first build (size depends on the selected model)
+- The web interface lets you select from 5 different model sizes:
+
+  - `tiny`: ~150MB - Fastest, lowest accuracy
+  - `base`: ~150MB - Fast with decent accuracy
+  - `small`: ~500MB - Good balance of speed and accuracy
+  - `medium`: ~1.5GB - Better accuracy, slower
+  - `large`: ~6GB - Best accuracy, slowest
+
+- When you switch models, the previously loaded model is unloaded to free up memory
+- Models are loaded on-demand (first transcription request) rather than at startup
+- The pre-built Docker image includes all model files for offline use
 - All uploaded audio files and generated transcripts are automatically deleted after processing for privacy
 - No data is stored persistently - everything is processed in memory only
-- Model size comparison:
-  - `tiny`: ~150MB
-  - `base`: ~150MB
-  - `small`: ~500MB
-  - `medium`: ~1.5GB
-  - `large`: ~6GB
 
 ## Technical Details
 
-### Limitations
+### Development vs Deployment
 
-- Limited error handling for concurrent requests
-- No HTTPS configuration included
-- Changing model size requires restarting the container
+- **Development Mode** (`docker-compose.yml`):
+
+  - Faster builds, doesn't download models during build
+  - Models are downloaded on first use (requires internet)
+  - Ideal for code modifications and testing
+
+- **Deployment Mode** (`docker-compose-deploy.yml`):
+  - Includes all Whisper models in the image
+  - Can be used completely offline
+  - Larger image size (~8GB) but fully portable
 
 ## Acknowledgments
 
