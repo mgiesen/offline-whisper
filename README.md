@@ -27,7 +27,7 @@ The pre-built Docker image contains all Whisper models and can be used completel
 2. **Run the container** (works offline)
 
    ```bash
-   docker run -d -p 8077:8077 ghcr.io/mgiesen/offline-whisper:latest
+   docker run -d -p 8077:8077 --name offline-whisper ghcr.io/mgiesen/offline-whisper:latest
    ```
 
 3. **Access the web interface** at `http://localhost:8077`
@@ -42,7 +42,7 @@ The pre-built Docker image contains all Whisper models and can be used completel
 
    # On the offline system
    docker load < offline-whisper.tar
-   docker run -d -p 8077:8077 ghcr.io/mgiesen/offline-whisper:latest
+   docker run -d -p 8077:8077 --name offline-whisper ghcr.io/mgiesen/offline-whisper:latest
    ```
 
 ### For Developers
