@@ -4,7 +4,7 @@ FROM nginx:alpine
 RUN rm /etc/nginx/conf.d/default.conf
 
 # Copy custom nginx configuration
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY multi-container.conf /etc/nginx/conf.d/default.conf
 
 # Copy static files
 COPY public/ /usr/share/nginx/html/

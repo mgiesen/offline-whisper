@@ -15,7 +15,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN mkdir -p /tmp
 
 # Copy application code
-COPY app/ .
+COPY main.py .
 
 # Start FastAPI application
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8076"]

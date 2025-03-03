@@ -1,41 +1,39 @@
-FROM python:3.9-slim as whisper
+# Basis-Image
+FROM python:3.9-slim
 
-# System dependencies for Whisper
-RUN apt-get update && apt-get install -y ffmpeg
+# Systempakete installieren: ffmpeg, nginx, supervisor
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    nginx \
+    supervisor
 
-# Set working directory
+# Arbeitsverzeichnis setzen
 WORKDIR /app
 
-# Copy and install dependencies
-COPY whisper-api/requirements.txt .
+# Kopiere nur die notwendigen Dateien direkt nach /app
+COPY whisper-api/main.py ./           
+COPY whisper-api/requirements.txt ./  
+COPY nginx/ ./nginx/
+COPY deploy/preload-models.py ./deploy/
+COPY deploy/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Python-Abhängigkeiten für die Whisper-API installieren
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
-COPY whisper-api/app/ .
+# Whisper-Modelle vorladen
+RUN python deploy/preload-models.py
 
-FROM nginx:alpine as nginx
-# Remove default nginx configuration
-RUN rm /etc/nginx/conf.d/default.conf
-
-# Copy custom nginx configuration
-COPY nginx/nginx.conf /etc/nginx/conf.d/default.conf
-
-# Copy static files
+# Nginx-Konfiguration und Dateien kopieren (überschreibt die Default-Konfiguration)
+COPY nginx/single-container.conf /etc/nginx/conf.d/default.conf
 COPY nginx/public/ /usr/share/nginx/html/
 
-# Final stage
-FROM nginx:alpine
+# Unnötige Dateien entfernen, um das Image zu verschlanken
+RUN rm -rf /app/deploy/preload-models.py \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# Copy from nginx build
-COPY --from=nginx /etc/nginx/conf.d/default.conf /etc/nginx/conf.d/default.conf
-COPY --from=nginx /usr/share/nginx/html/ /usr/share/nginx/html/
+# Ports freigeben: 8076 (API) und 8077 (Nginx) 
+EXPOSE 8076 8077
 
-# Copy from whisper build
-COPY --from=whisper /app /whisper
-COPY --from=whisper /root/.cache/whisper /root/.cache/whisper
-
-# Expose port
-EXPOSE 8077
-
-# Start both services
-CMD ["nginx", "-g", "daemon off;"]
+# Startbefehl: Supervisord übernimmt den Start und die Überwachung beider Prozesse
+CMD ["supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
